@@ -1,11 +1,18 @@
 #!python3
+"""
+Example usage:
+
+To create a clip with cuts from 00:28:30.550 to 00:28:35.718 and 00:28:57.711 to 00:29:03.068:
+    ffmpeg-wz v:\2022-02-07_22-12-09.mkv clip.mp4 00:28:30.550 00:28:35.718 00:28:57.711 00:29:03.068
+To create the same clip but with a warzone-style crop (minimap and stats moved inside the crop) to 1080x1080:
+    ffmpeg-wz v:\2022-02-07_22-12-09.mkv -c 1:1 crop.mp4 00:28:30.550 00:28:35.718 00:28:57.711 00:29:03.068
+
+"""
 import argparse
 import re
 import shlex
 import subprocess
-from itertools import pairwise
 from pathlib import Path
-from textwrap import dedent
 
 
 def parse_crop(value):
@@ -135,4 +142,3 @@ if __name__ == '__main__':
             elif not args.dirty:
                 for clip in clips:
                     clip.unlink()
-
