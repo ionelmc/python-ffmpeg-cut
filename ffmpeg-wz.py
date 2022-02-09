@@ -40,23 +40,32 @@ parser = argparse.ArgumentParser(description='ffmpeg wrapper')
 parser.add_argument('input', help='input file', type=argparse.FileType('r'))
 parser.add_argument('output', help='output file')
 parser.add_argument('timestamp', help='pairs of timestamps to cut', type=parse_timestamp, nargs='*')
-parser.add_argument('--crop', '-c', help='crop input to a given ratio', type=parse_crop)
-parser.add_argument('--quality', '-q', help='libx265 crf', type=int, default=15)
+parser.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop)
+parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15)
+parser.add_argument('-d', '--dry-run', action='store_true')
+parser.add_argument('-r', '--dirty', action='store_true')
 
 
-def check_call(args):
+def check_call(*args, dry_run):
     pretty = ' '.join(shlex.quote(i) for i in args)
     width = len(pretty) + 8
-    print('=' * width)
-    print(f'    {pretty}')
-    print('=' * width)
-    subprocess.check_call(args)
+    if dry_run:
+        print(f'    {pretty}')
+    else:
+        print('=' * width)
+        print(f'    {pretty}')
+        print('=' * width)
+        subprocess.check_call(args)
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
     if len(args.timestamp) % 2:
         parser.error('must have an even number of timestamps')
+
+    print(f'parsed:\n    {args}')
+    if args.dry_run:
+        print('would run:')
 
     if args.crop:
         width_ratio, height_ratio = args.crop
@@ -80,27 +89,50 @@ if __name__ == '__main__':
     match args.timestamp:
         case None:
             if filters:
-                check_call(['ffmpeg', '-i', args.input.name] + filters + ['-c:v', 'libx265', '-crf', str(args.quality), args.output])
+                check_call(
+                    'ffmpeg', '-i', args.input.name, *filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
+                    dry_run=args.dry_run
+                )
             else:
                 parser.error('no crop and no timestamps')
         case [start, end]:
-            check_call(['ffmpeg', '-ss', start, '-to', end, '-i', args.input.name] + filters + ['-c:v', 'libx265', '-crf', str(args.quality), args.output])
+            check_call(
+                'ffmpeg', '-ss', start, '-to', end, '-i', args.input.name, *filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
+                dry_run=args.dry_run
+            )
         case [*many]:
             many = iter(many)
             clips = []
             for pos, pair in enumerate(zip(many, many)):
                 clips.append(clip := output.with_stem(f'{output.stem}-{pos:03}').with_suffix(output.suffix))
                 start, end = pair
-                if clip.exists():
-                    continue
-                check_call(['ffmpeg', '-n', '-ss', start, '-to', end, '-i', args.input.name] + filters + ['-c:v', 'libx265', '-crf', str(args.quality), str(clip)])
+                if args.dry_run:
+                    check_call(
+                        'ffmpeg', '-ss', start, '-to', end, '-i', args.input.name, *filters, '-c:v', 'libx265', '-crf', str(args.quality), str(clip),
+                        dry_run=True
+                    )
+                else:
+                    if clip.exists():
+                        if clip.stat().st_size:
+                            continue
+                        else:
+                            clip.unlink()
+                    check_call(
+                        'ffmpeg', '-n', '-ss', start, '-to', end, '-i', args.input.name, *filters, '-c:v', 'libx265', '-crf', str(args.quality), str(clip),
+                        dry_run=args.dry_run
+                    )
             output_concat = output.with_suffix('.clips')
-            output_concat.write_text('\n'.join(f'file {str(clip)!r}' for clip in clips))
-            check_call([
-                'ffmpeg',
-                '-f', 'concat',
-                '-fflags', '+igndts',
-                '-i', str(output_concat),
-                '-c', 'copy',
-                str(args.output)
-            ])
+            if not args.dry_run:
+                output_concat.write_text('\n'.join(f'file {str(clip)!r}' for clip in clips))
+            check_call(
+                'ffmpeg', '-f', 'concat', '-i', str(output_concat), '-c', 'copy', str(args.output),
+                dry_run=args.dry_run
+            )
+
+            if args.dry_run:
+                print(f'would write to {output_concat}:\n    ', end='')
+                print('\n    '.join(f'file {str(clip)!r}' for clip in clips))
+            elif not args.dirty:
+                for clip in clips:
+                    clip.unlink()
+
