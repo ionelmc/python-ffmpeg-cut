@@ -1,0 +1,2 @@
+setlocal EnableDelayedExpansion
+ffmpeg.exe -ss "%~2" -to "%~3" -i "%~1" -filter_complex "[0:v]scale=-1:1080:flags=lanczos[tmp1];[tmp1]split[a][tmp2];[tmp2]split[b][c];[a]crop=1080:1080:420:0[base];[b]crop=225:34:1625:42[kills];[c]crop=270:270:36:24[map];[base][map]overlay=0:0[out];[out][kills]overlay=main_w-overlay_w:0" -c:a copy -c:v libx265 -crf 15 %4
