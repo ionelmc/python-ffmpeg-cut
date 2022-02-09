@@ -34,7 +34,7 @@ def parse_crop(value):
     return w, h
 
 
-timestamp_re = re.compile('\d\d:\d\d:\d\d.\d\d\d')
+timestamp_re = re.compile(r'\d\d:\d\d:\d\d.\d\d\d')
 
 
 def parse_timestamp(value):
