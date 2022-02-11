@@ -52,8 +52,13 @@ def parse_crop(value):
 
 timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
 file_instruction_re = re.compile("file '(.+)'")
+clip_comment_re = re.compile(r'# (?P<path>.+?) (?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
 
-Cut = namedtuple('Cut', 'start end')
+
+@dataclass
+class Cut:
+    start: str
+    end: str
 
 
 def parse_cut(value):
@@ -107,6 +112,32 @@ class ClipList:
         return len(self.clips)
 
 
+def clips_cut(args):
+    instructions = []
+
+    for line in args.input.read_text().splitlines():
+        line = line.strip()
+        if match := clip_comment_re.fullmatch(line):
+            groups = match.groupdict()
+            instructions.append(current_instruction := Instruction(
+                input=pathlib.Path(groups['path']),
+                cut=[Cut(groups['start'], groups['end'])],
+                args=args,
+            ))
+            if not current_instruction.input.exists() and not args.dry_run:
+                parser.error(f'{line!r} does not exist')
+
+    print('parsed input:')
+    for instruction in instructions:
+        print(f'    {instruction}')
+
+    clips = ClipList()
+    for instruction in instructions:
+        multi_cut(clips, instruction)
+
+    join_clips(clips, args)
+
+
 def text_cut(args):
     instructions = []
     current_instruction = None
@@ -134,6 +165,9 @@ def text_cut(args):
     for instruction in instructions:
         print(f'    {instruction}')
 
+    if args.dry_run:
+        print('would run:')
+
     clips = ClipList()
     for instruction in instructions:
         multi_cut(clips, instruction)
@@ -158,11 +192,12 @@ def multi_cut(clips: ClipList, args):
     output = args.output
 
     for pos, cut in enumerate(cuts):
-        clips.append(args.input, cut, clip := output.with_stem(f'{output.stem}-{len(clips):03}').with_suffix(output.suffix))
-        start, end = cut
+        clips.append(args.input, cut,
+                     clip := output.with_stem(f'{output.stem}-{len(clips):03}').with_suffix(output.suffix))
         if args.dry_run:
             check_call(
-                'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), clip,
+                'ffmpeg', '-ss', cut.start, '-to', cut.end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf',
+                str(args.quality), clip,
                 dry_run=True
             )
         else:
@@ -172,7 +207,8 @@ def multi_cut(clips: ClipList, args):
                 else:
                     clip.unlink()
             check_call(
-                'ffmpeg', '-n', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), clip,
+                'ffmpeg', '-n', '-ss', cut.start, '-to', cut.end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf',
+                str(args.quality), clip,
                 dry_run=args.dry_run
             )
 
@@ -215,8 +251,11 @@ If you use --text then the input file must contain instructions in the form:
 parser_join_group = parser.add_mutually_exclusive_group()
 parser_crop_group = parser_join_group.add_mutually_exclusive_group()
 parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
-parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend', dest='filters', metavar='W:H', default=[])
-parser_join_group.add_argument('-n', '--no-join', help='only produce the intermediary clips and ffmpeg concat instruction file', action='store_true')
+parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend',
+                               dest='filters', metavar='W:H', default=[])
+parser_join_group.add_argument('-n', '--no-join',
+                               help='only produce the intermediary clips and ffmpeg concat instruction file',
+                               action='store_true')
 parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
 parser.add_argument('-d', '--dry-run', action='store_true')
 parser.add_argument('-r', '--dirty', action='store_true')
@@ -224,6 +263,7 @@ parser.add_argument('input', help='input file', type=pathlib.Path)
 parser.add_argument('output', help='output file', type=pathlib.Path)
 parser_cut_group = parser.add_mutually_exclusive_group()
 parser_cut_group.add_argument('-t', '--text', help='input file is text file with cuts', action='store_true')
+parser_cut_group.add_argument('-l', '--clips', help='input file is clips file with cuts', action='store_true')
 parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='?', action='append')
 parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
 
@@ -259,17 +299,19 @@ def main():
         if args.no_join:
             args.dirty = True
 
-
         match args.cut:
             case [None] | []:
                 if args.text:
                     text_cut(args)
+                elif args.clips:
+                    clips_cut(args)
                 elif args.filters:
                     if args.dry_run:
                         print('would run:')
 
                     check_call(
-                        'ffmpeg', '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
+                        'ffmpeg', '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality),
+                        args.output,
                         dry_run=args.dry_run
                     )
                 else:
@@ -279,7 +321,8 @@ def main():
                     print('would run:')
 
                 check_call(
-                    'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
+                    'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf',
+                    str(args.quality), args.output,
                     dry_run=args.dry_run
                 )
             case _:
