@@ -49,7 +49,9 @@ def parse_crop(value):
          f'[out][kills]overlay=main_w-overlay_w:0')
     ]
 
+
 timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
+file_instruction_re = re.compile("file '(.+)'")
 
 Cut = namedtuple('Cut', 'start end')
 
@@ -70,6 +72,10 @@ class Instruction:
 
     def __getattr__(self, item):
         return getattr(self.args, item)
+
+    def __str__(self):
+        cuts = ' '.join(f'{cut.start}-{cut.end}' for cut in self.cut)
+        return f'{self.input} {cuts}'
 
 
 @dataclass
@@ -92,7 +98,7 @@ class ClipList:
 
     def as_concat_input(self):
         return '\n'.join(
-            f'# {clip.input} {clip.cut.start}{clip.cut.end}\n'
+            f'# {clip.input} {clip.cut.start}-{clip.cut.end}\n'
             f'file {str(clip.output)!r}\n'
             for clip in self.clips
         )
@@ -121,7 +127,7 @@ def text_cut(args):
                 cut=[],
                 args=args,
             ))
-            if not current_instruction.input.exists():
+            if not current_instruction.input.exists() and not args.dry_run:
                 parser.error(f'{line!r} does not exist')
 
     print('parsed input:')
@@ -132,18 +138,7 @@ def text_cut(args):
     for instruction in instructions:
         multi_cut(clips, instruction)
 
-    output_concat = args.output.with_suffix('.clips')
-    if not args.dry_run:
-        output_concat.write_text(clips.as_concat_input())
-
-    join_clips(output_concat, args)
-
-    if args.dry_run:
-        print(f'would write to {output_concat}:')
-        print(textwrap.indent(clips.as_concat_input(), '    '))
-    elif not args.dirty:
-        for clip in clips.outputs:
-            clip.unlink()
+    join_clips(clips, args)
 
 
 def check_call(*args, dry_run):
@@ -182,12 +177,24 @@ def multi_cut(clips: ClipList, args):
             )
 
 
-def join_clips(clips_file, args):
+def join_clips(clips: ClipList, args, dirty=False):
+    clips_file = args.output.with_suffix('.clips')
+
+    if args.dry_run:
+        print(f'would write to {clips_file}:')
+        print(textwrap.indent(clips.as_concat_input(), f'    '))
+        print('would run:')
+    else:
+        clips_file.write_text(clips.as_concat_input())
+
     if not args.no_join:
         check_call(
-            'ffmpeg', '-f', 'concat', '-i', clips_file, *args.filters, '-c', 'copy', args.output,
+            'ffmpeg', '-f', 'concat', '-i', clips_file, '-c', 'copy', args.output,
             dry_run=args.dry_run
         )
+        if not args.dry_run and not args.dirty and not dirty:
+            for clip in clips.outputs:
+                clip.unlink()
 
 
 parser = argparse.ArgumentParser(
@@ -206,10 +213,11 @@ If you use --text then the input file must contain instructions in the form:
     HH:MM:SS.mmm-HH:MM:SS.mmm
 ''')
 parser_join_group = parser.add_mutually_exclusive_group()
-parser_join_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
+parser_crop_group = parser_join_group.add_mutually_exclusive_group()
+parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
+parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend', dest='filters', metavar='W:H', default=[])
 parser_join_group.add_argument('-n', '--no-join', help='only produce the intermediary clips and ffmpeg concat instruction file', action='store_true')
-parser.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend', dest='filters')
-parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15)
+parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
 parser.add_argument('-d', '--dry-run', action='store_true')
 parser.add_argument('-r', '--dirty', action='store_true')
 parser.add_argument('input', help='input file', type=pathlib.Path)
@@ -219,26 +227,47 @@ parser_cut_group.add_argument('-t', '--text', help='input file is text file with
 parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='?', action='append')
 parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
 
+
 def main():
     args = parser.parse_args()
     print(f'parsed:\n    {args}')
 
-    if args.dry_run:
-        print('would run:')
-
     if args.join:
-        join_clips(args.input, args)
+        clips = ClipList()
+        with args.input.open('r') as fh:
+            while True:
+                line = fh.readline()
+                if not line:
+                    break
+                line = line.strip()
+                if line.startswith('#'):
+                    original_file, cut = line[1:].strip().split()
+                    cut = parse_cut(cut)
+                elif line:
+                    match shlex.split(line):
+                        case ['file', clip_path]:
+                            clip_file = pathlib.Path(clip_path)
+                            if clip_file.exists():
+                                clips.append(original_file, cut, clip_file)
+                            else:
+                                print(f'WARNING: {clip_file!r} does not exist!')
+                        case junk:
+                            print(f'WARNING: found junk in clips file: {junk!r}')
+
+        join_clips(clips, args, dirty=True)
     else:
         if args.no_join:
             args.dirty = True
 
 
-
         match args.cut:
-            case []:
+            case [None] | []:
                 if args.text:
                     text_cut(args)
                 elif args.filters:
+                    if args.dry_run:
+                        print('would run:')
+
                     check_call(
                         'ffmpeg', '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
                         dry_run=args.dry_run
@@ -246,6 +275,9 @@ def main():
                 else:
                     parser.error('no crop and no timestamps')
             case [(start, end)]:
+                if args.dry_run:
+                    print('would run:')
+
                 check_call(
                     'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', 'libx265', '-crf', str(args.quality), args.output,
                     dry_run=args.dry_run
@@ -253,19 +285,7 @@ def main():
             case _:
                 clips = ClipList()
                 multi_cut(clips, args)
-
-                output_concat = args.output.with_suffix('.clips')
-                if not args.dry_run:
-                    output_concat.write_text(clips.as_concat_input())
-
-                join_clips(output_concat, args)
-
-                if args.dry_run:
-                    print(f'would write to {output_concat}:')
-                    print(textwrap.indent(clips.as_concat_input(), '    '))
-                elif not args.dirty:
-                    for clip in clips.outputs:
-                        clip.unlink()
+                join_clips(clips, args)
 
 
 if __name__ == '__main__':
