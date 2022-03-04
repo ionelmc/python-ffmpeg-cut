@@ -41,7 +41,7 @@ def parse_crop(value):
         (f'[0:v]scale=-1:{height}:flags=lanczos[tmp1];'
          f'[tmp1]split[a][tmp2];'
          f'[tmp2]split[b][c];'
-         f'[a]crop={height}:{height}:{side_crop}:0[base];'
+         f'[a]crop={width}:{height}:{side_crop}:0[base];'
          f'[b]crop=225:34:1625:42[kills];'
          f'[c]crop=270:270:36:24[map];'
          f'[base][map]overlay=0:0[out];'
