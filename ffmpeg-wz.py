@@ -40,12 +40,15 @@ def parse_crop(value):
         '-filter_complex',
         (f'[0:v]scale=-1:{height}:flags=lanczos[tmp1];'
          f'[tmp1]split[a][tmp2];'
-         f'[tmp2]split[b][c];'
+         f'[tmp2]split[b][tmp3];'
+         f'[tmp3]split[c][d];'
          f'[a]crop={width}:{height}:{side_crop}:0[base];'
          f'[b]crop=225:34:1625:42[kills];'
          f'[c]crop=270:270:36:24[map];'
-         f'[base][map]overlay=0:0[out];'
-         f'[out][kills]overlay=main_w-overlay_w:0')
+         f'[d]crop=255:275:35:775[wc];'
+         f'[base][map]overlay=0:0[out1];'
+         f'[out1][wc]overlay=0:main_h-overlay_h[out2];'
+         f'[out2][kills]overlay=main_w-overlay_w:0')
     ]
 
 
