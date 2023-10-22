@@ -53,7 +53,7 @@ def parse_crop(value):
 
 def parse_filter(value):
     try:
-        x, y, w, h, spec = value.split(':')
+        x, y, w, h, spec = value.split(':', 4)
     except ValueError:
         raise argparse.ArgumentTypeError('must be in the form: "X:Y:W:H:filter-spec"')
     try:
@@ -66,7 +66,7 @@ def parse_filter(value):
 
     return [
         '-filter_complex',
-        (f'[0:v]crop={w}:{h}:{x}c:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}')
+        (f'[0:v]crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}')
     ]
 
 
