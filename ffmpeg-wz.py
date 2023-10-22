@@ -51,6 +51,24 @@ def parse_crop(value):
          f'[out2][kills]overlay=main_w-overlay_w:0')
     ]
 
+def parse_filter(value):
+    try:
+        x, y, w, h, spec = value.split(':')
+    except ValueError:
+        raise argparse.ArgumentTypeError('must be in the form: "X:Y:W:H:filter-spec"')
+    try:
+        x = int(x)
+        y = int(y)
+        w = int(w)
+        h = int(h)
+    except ValueError:
+        raise argparse.ArgumentTypeError('must have integer values')
+
+    return [
+        '-filter_complex',
+        (f'[0:v]crop={w}:{h}:{x}c:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}')
+    ]
+
 
 timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
 file_instruction_re = re.compile("file '(.+)'")
@@ -254,6 +272,8 @@ parser_join_group = parser.add_mutually_exclusive_group()
 parser_crop_group = parser_join_group.add_mutually_exclusive_group()
 parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
 parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend',
+                               dest='filters', metavar='W:H', default=[])
+parser_crop_group.add_argument('-f', '--filter', help='arbitrary filter on specific zone', type=parse_filter, action='extend',
                                dest='filters', metavar='W:H', default=[])
 parser_join_group.add_argument('-n', '--no-join',
                                help='only produce the intermediary clips and ffmpeg concat instruction file',
