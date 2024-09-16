@@ -16,81 +16,15 @@ import subprocess
 import textwrap
 from dataclasses import dataclass, field
 
-
-def parse_crop(value):
-    if ':' not in value:
-        raise argparse.ArgumentTypeError('must ratio in the form: "W:H"')
-    try:
-        width_ratio, height_ratio = value.split(':')
-    except ValueError:
-        raise argparse.ArgumentTypeError('must ratio in the form: "W:H"')
-    try:
-        width_ratio = int(width_ratio)
-        height_ratio = int(height_ratio)
-    except ValueError:
-        raise argparse.ArgumentTypeError('must have integer values')
-
-    if 1080.0 * width_ratio / height_ratio > 1920:
-        raise argparse.ArgumentTypeError('cannot exceed 16:9 ratio')
-
-    height = 1080
-    width = 1080.0 * width_ratio / height_ratio
-    side_crop = int((1920 - width) / 2.0)
-    return [
-        (f'[0:v]scale=-1:{height}:flags=lanczos[tmp1];'
-         f'[tmp1]split[a][tmp2];'
-         f'[tmp2]split[b][tmp3];'
-         f'[tmp3]split[c][d];'
-         f'[a]crop={width}:{height}:{side_crop}:0[base];'
-         f'[b]crop=225:34:1625:42[kills];'
-         f'[c]crop=270:270:36:24[map];'
-         f'[d]crop=255:275:35:775[wc];'
-         f'[base][map]overlay=0:0[out1];'
-         f'[out1][wc]overlay=0:main_h-overlay_h[out2];'
-         f'[out2][kills]overlay=main_w-overlay_w:0')
-    ]
-
-
-def parse_filter(value):
-    try:
-        x, y, w, h, spec = value.split(':', 4)
-    except ValueError:
-        raise argparse.ArgumentTypeError('must be in the form: "X:Y:W:H:filter-spec"')
-    try:
-        x = int(x)
-        y = int(y)
-        w = int(w)
-        h = int(h)
-    except ValueError:
-        raise argparse.ArgumentTypeError('must have integer values')
-
-    return [
-        f'[0:v]crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}'
-    ]
-
-
-def parse_fps(value):
-    fps = int(value)
-    return [f'[0:v]fps={fps}']
-
-
-timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
-file_instruction_re = re.compile("file '(.+)'")
-clip_comment_re = re.compile(r'# (?P<path>.+?) (?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
+TIMESTAMP_RE = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
+FILE_INSTRUCTION_RE = re.compile("file '(.+)'")
+CLIP_COMMENT_RE = re.compile(r'# (?P<path>.+?) (?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
 
 
 @dataclass
 class Cut:
     start: str
     end: str
-
-
-def parse_cut(value):
-    if match := timestamp_re.fullmatch(value):
-        groups = match.groupdict()
-        return Cut(groups['start'], groups['end'])
-    else:
-        raise argparse.ArgumentTypeError('must be value of the form: HH:MM:SS.mmm-HH:MM:SS.mmm')
 
 
 @dataclass
@@ -136,12 +70,116 @@ class ClipList:
         return len(self.clips)
 
 
+def parse_crop(value):
+    if ':' not in value:
+        raise argparse.ArgumentTypeError('must ratio in the form: "W:H"')
+    try:
+        width_ratio, height_ratio = value.split(':')
+    except ValueError:
+        raise argparse.ArgumentTypeError('must ratio in the form: "W:H"')
+    try:
+        width_ratio = int(width_ratio)
+        height_ratio = int(height_ratio)
+    except ValueError:
+        raise argparse.ArgumentTypeError('must have integer values')
+
+    if 1080.0 * width_ratio / height_ratio > 1920:
+        raise argparse.ArgumentTypeError('cannot exceed 16:9 ratio')
+
+    height = 1080
+    width = 1080.0 * width_ratio / height_ratio
+    side_crop = int((1920 - width) / 2.0)
+    return [
+        (f'scale=-1:{height}:flags=lanczos[tmp1];'
+         f'[tmp1]split[a][tmp2];'
+         f'[tmp2]split[b][tmp3];'
+         f'[tmp3]split[c][d];'
+         f'[a]crop={width}:{height}:{side_crop}:0[base];'
+         f'[b]crop=225:34:1625:42[kills];'
+         f'[c]crop=270:270:36:24[map];'
+         f'[d]crop=255:275:35:775[wc];'
+         f'[base][map]overlay=0:0[out1];'
+         f'[out1][wc]overlay=0:main_h-overlay_h[out2];'
+         f'[out2][kills]overlay=main_w-overlay_w:0')
+    ]
+
+
+def parse_filter(value):
+    try:
+        x, y, w, h, spec = value.split(':', 4)
+    except ValueError:
+        raise argparse.ArgumentTypeError('must be in the form: "X:Y:W:H:filter-spec"')
+    try:
+        x = int(x)
+        y = int(y)
+        w = int(w)
+        h = int(h)
+    except ValueError:
+        raise argparse.ArgumentTypeError('must have integer values')
+
+    return [
+        f'crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}'
+    ]
+
+
+def parse_fps(value):
+    fps = int(value)
+    return [f'fps={fps}']
+
+
+def parse_cut(value):
+    if match := TIMESTAMP_RE.fullmatch(value):
+        groups = match.groupdict()
+        return Cut(groups['start'], groups['end'])
+    else:
+        raise argparse.ArgumentTypeError('must be value of the form: HH:MM:SS.mmm-HH:MM:SS.mmm')
+
+
+parser = argparse.ArgumentParser(
+    description='ffmpeg wrapper',
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog='''
+If you use --text then the input file must contain instructions in the form:
+
+    path/to/video.mkv
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+
+    path/to/another/video.mp4
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+''')
+parser_join_group = parser.add_mutually_exclusive_group()
+parser_crop_group = parser_join_group.add_mutually_exclusive_group()
+parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
+parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend',
+                               dest='filters', metavar='W:H', default=[])
+parser_crop_group.add_argument('-f', '--filter', help='arbitrary filter on specific zone', type=parse_filter, action='extend',
+                               dest='filters', metavar='W:H', default=[])
+parser_join_group.add_argument('-n', '--no-join',
+                               help='only produce the intermediary clips and ffmpeg concat instruction file',
+                               action='store_true')
+parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
+parser.add_argument('-d', '--dry-run', action='store_true')
+parser.add_argument('-r', '--dirty', action='store_true')
+parser.add_argument('-s', '--fps', dest='filters', action='extend', type=parse_fps, default=[])
+parser.add_argument('-e', '--encoder', default='libx264', help='you can use `libx265` for better compression but possibly worse player support')
+parser.add_argument('input', help='input file', type=pathlib.Path)
+parser.add_argument('output', help='output file', type=pathlib.Path)
+parser_cut_group = parser.add_mutually_exclusive_group()
+parser_cut_group.add_argument('-t', '--text', help='input file is text file with cuts', action='store_true')
+parser_cut_group.add_argument('-l', '--clips', help='input file is clips file with cuts', action='store_true')
+parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='?', action='append')
+parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
+
+
 def clips_cut(args):
     instructions = []
 
     for line in args.input.read_text().splitlines():
         line = line.strip()
-        if match := clip_comment_re.fullmatch(line):
+        if match := CLIP_COMMENT_RE.fullmatch(line):
             groups = match.groupdict()
             instructions.append(current_instruction := Instruction(
                 input=pathlib.Path(groups['path']),
@@ -170,7 +208,7 @@ def text_cut(args):
         line = line.strip()
         if not line:
             continue
-        if match := timestamp_re.fullmatch(line):
+        if match := TIMESTAMP_RE.fullmatch(line):
             if current_instruction is None:
                 parser.error(f'did not find a path before {line!r}')
             else:
@@ -255,45 +293,6 @@ def join_clips(clips: ClipList, args, dirty=False):
         if not args.dry_run and not args.dirty and not dirty:
             for clip in clips.outputs:
                 clip.unlink()
-
-
-parser = argparse.ArgumentParser(
-    description='ffmpeg wrapper',
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog='''
-If you use --text then the input file must contain instructions in the form:
-
-    path/to/video.mkv
-    HH:MM:SS.mmm-HH:MM:SS.mmm
-    HH:MM:SS.mmm-HH:MM:SS.mmm
-    
-    path/to/another/video.mp4
-    HH:MM:SS.mmm-HH:MM:SS.mmm
-    HH:MM:SS.mmm-HH:MM:SS.mmm
-    HH:MM:SS.mmm-HH:MM:SS.mmm
-''')
-parser_join_group = parser.add_mutually_exclusive_group()
-parser_crop_group = parser_join_group.add_mutually_exclusive_group()
-parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
-parser_crop_group.add_argument('-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend',
-                               dest='filters', metavar='W:H', default=[])
-parser_crop_group.add_argument('-f', '--filter', help='arbitrary filter on specific zone', type=parse_filter, action='extend',
-                               dest='filters', metavar='W:H', default=[])
-parser_join_group.add_argument('-n', '--no-join',
-                               help='only produce the intermediary clips and ffmpeg concat instruction file',
-                               action='store_true')
-parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
-parser.add_argument('-d', '--dry-run', action='store_true')
-parser.add_argument('-r', '--dirty', action='store_true')
-parser.add_argument('-s', '--fps', dest='filters', type=parse_fps, default=[])
-parser.add_argument('-e', '--encoder', default='libx264', help='you can use `libx265` for better compression but possibly worse player support')
-parser.add_argument('input', help='input file', type=pathlib.Path)
-parser.add_argument('output', help='output file', type=pathlib.Path)
-parser_cut_group = parser.add_mutually_exclusive_group()
-parser_cut_group.add_argument('-t', '--text', help='input file is text file with cuts', action='store_true')
-parser_cut_group.add_argument('-l', '--clips', help='input file is clips file with cuts', action='store_true')
-parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='?', action='append')
-parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
 
 
 def join_filters(filters):
