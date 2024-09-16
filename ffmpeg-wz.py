@@ -51,6 +51,7 @@ def parse_crop(value):
          f'[out2][kills]overlay=main_w-overlay_w:0')
     ]
 
+
 def parse_filter(value):
     try:
         x, y, w, h, spec = value.split(':', 4)
@@ -68,6 +69,11 @@ def parse_filter(value):
         '-filter_complex',
         (f'[0:v]crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}')
     ]
+
+
+def parse_fps(value):
+    fps = int(value)
+    return ['-filter_complex', f'[0:v]fps={fps};']
 
 
 timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
@@ -281,6 +287,7 @@ parser_join_group.add_argument('-n', '--no-join',
 parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
 parser.add_argument('-d', '--dry-run', action='store_true')
 parser.add_argument('-r', '--dirty', action='store_true')
+parser.add_argument('-s', '--fps', dest='filters', type=parse_fps, default=[])
 parser.add_argument('-e', '--encoder', default='libx264', help='you can use `libx265` for better compression but possibly worse player support')
 parser.add_argument('input', help='input file', type=pathlib.Path)
 parser.add_argument('output', help='output file', type=pathlib.Path)
