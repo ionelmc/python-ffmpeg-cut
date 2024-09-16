@@ -298,10 +298,19 @@ parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nar
 
 def join_filters(filters):
     if filters:
-        return [
-            '-filter_complex',
-            ';'.join(filters)
-        ]
+        filter_chain = []
+        last_step = len(filters) - 1
+        for step, filter in enumerate(filters):
+            if step == last_step:
+                output = ''
+            else:
+                output = f'[step_{step}]'
+            if step:
+                filter_chain.append(f'[step_{step - 1}]{filter}{output}')
+            else:
+                filter_chain.append(f'[0:v]{filter}{output}')
+
+        return ['-filter_complex', ';'.join(filter_chain)]
     else:
         return []
 
