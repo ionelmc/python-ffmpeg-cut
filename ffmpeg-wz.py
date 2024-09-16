@@ -37,7 +37,6 @@ def parse_crop(value):
     width = 1080.0 * width_ratio / height_ratio
     side_crop = int((1920 - width) / 2.0)
     return [
-        '-filter_complex',
         (f'[0:v]scale=-1:{height}:flags=lanczos[tmp1];'
          f'[tmp1]split[a][tmp2];'
          f'[tmp2]split[b][tmp3];'
@@ -66,14 +65,13 @@ def parse_filter(value):
         raise argparse.ArgumentTypeError('must have integer values')
 
     return [
-        '-filter_complex',
-        (f'[0:v]crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}')
+        f'[0:v]crop={w}:{h}:{x}:{y},{spec}[filter1];[0:v][filter1]overlay={x}:{y}'
     ]
 
 
 def parse_fps(value):
     fps = int(value)
-    return ['-filter_complex', f'[0:v]fps={fps};']
+    return [f'[0:v]fps={fps}']
 
 
 timestamp_re = re.compile(r'(?P<start>(\d\d:)?\d\d:\d\d.\d\d\d)-(?P<end>(\d\d:)?\d\d:\d\d.\d\d\d)')
@@ -222,7 +220,7 @@ def multi_cut(clips: ClipList, args):
                      clip := output.with_stem(f'{output.stem}-{len(clips):03}').with_suffix(output.suffix))
         if args.dry_run:
             check_call(
-                'ffmpeg', '-ss', cut.start, '-to', cut.end, '-i', args.input, *args.filters, '-c:v', args.encoder, '-crf',
+                'ffmpeg', '-ss', cut.start, '-to', cut.end, '-i', args.input, *join_filters(args.filters), '-c:v', args.encoder, '-crf',
                 str(args.quality), clip,
                 dry_run=True
             )
@@ -233,7 +231,7 @@ def multi_cut(clips: ClipList, args):
                 else:
                     clip.unlink()
             check_call(
-                'ffmpeg', '-n', '-ss', cut.start, '-to', cut.end, '-i', args.input, *args.filters, '-c:v', args.encoder, '-crf',
+                'ffmpeg', '-n', '-ss', cut.start, '-to', cut.end, '-i', args.input, *join_filters(args.filters), '-c:v', args.encoder, '-crf',
                 str(args.quality), clip,
                 dry_run=args.dry_run
             )
@@ -298,6 +296,16 @@ parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=pars
 parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
 
 
+def join_filters(filters):
+    if filters:
+        return [
+            '-filter_complex',
+            ';'.join(filters)
+        ]
+    else:
+        return []
+
+
 def main():
     args = parser.parse_args()
     print(f'parsed:\n    {args}')
@@ -340,7 +348,7 @@ def main():
                         print('would run:')
 
                     check_call(
-                        'ffmpeg', '-i', args.input, *args.filters, '-c:v', args.encoder, '-crf', str(args.quality),
+                        'ffmpeg', '-i', args.input, *join_filters(args.filters), '-c:v', args.encoder, '-crf', str(args.quality),
                         args.output,
                         dry_run=args.dry_run
                     )
@@ -351,7 +359,7 @@ def main():
                     print('would run:')
 
                 check_call(
-                    'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *args.filters, '-c:v', args.encoder, '-crf',
+                    'ffmpeg', '-ss', start, '-to', end, '-i', args.input, *join_filters(args.filters), '-c:v', args.encoder, '-crf',
                     str(args.quality), args.output,
                     dry_run=args.dry_run
                 )
