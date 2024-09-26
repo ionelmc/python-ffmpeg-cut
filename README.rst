@@ -64,8 +64,42 @@ You can also install the in-development version with::
 Documentation
 =============
 
-
 https://python-ffmpeg-cut.readthedocs.io/
+
+Usage: ``ffmpeg-cut [-h] [[-j | -c W:H | -f W:H |] -n] [-q CRF] [-d] [-r] [-s FPS] [-e ENCODER] [-t] [-l] input output [cut] [cut ...]``
+
+positional arguments:
+  input
+    input file
+  output
+    output file
+  cut
+    pair of timestamps to cut
+
+options:
+  -h, --help                     show this help message and exit
+  -j, --join                     input file is ffmpeg concat instruction file
+  -c SIZE, --crop SIZE             crop input to a given ratio
+  -f SIZE, --filter SIZE           arbitrary filter on specific zone
+  -n, --no-join                  only produce the intermediary clips and ffmpeg concat instruction file
+  -q CRF, --quality CRF          libx265 crf
+  -d, --dry-run                  only display what would be run
+  -r, --dirty                    do not delete intermediary files
+  -s FPS, --fps FPS              output framerate
+  -e ENCODER, --encoder ENCODER  you can use `libx265` for better compression but possibly worse player support
+  -t, --text                     input file is text file with cuts
+  -l, --clips                    input file is clips file with cuts
+
+If you use --text then the input file must contain instructions in the form::
+
+    path/to/video.mkv
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+
+    path/to/another/video.mp4
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
+    HH:MM:SS.mmm-HH:MM:SS.mmm
 
 
 Development
