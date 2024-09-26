@@ -13,7 +13,7 @@ def read(*names, **kwargs):
 
 setup(
     name='ffmpeg-cut',
-    version='0.0.0',
+    version='1.0.0',
     license='BSD-2-Clause',
     description='Cut and join CLI wrapper for ffmpeg.',
     long_description='{}\n{}'.format(
