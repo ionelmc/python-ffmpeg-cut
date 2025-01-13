@@ -252,6 +252,8 @@ def multi_cut(clips: ClipList, args):
             cut.start,
             '-to',
             cut.end,
+            '-avoid_negative_ts',  # https://trac.ffmpeg.org/wiki/Seeking#Cutting
+            '2',
             '-i',
             args.input,
             *join_filters(args.filters),
