@@ -239,47 +239,29 @@ def multi_cut(clips: ClipList, args):
     output = args.output
 
     for cut in cuts:
-        clips.append(args.input, cut, clip := output.with_stem(f'{output.stem}-{len(clips):03}').with_suffix(output.suffix))
-        if args.dry_run:
-            check_call(
-                'ffmpeg',
-                '-ss',
-                cut.start,
-                '-to',
-                cut.end,
-                '-i',
-                args.input,
-                *join_filters(args.filters),
-                '-c:v',
-                args.encoder,
-                '-crf',
-                str(args.quality),
-                clip,
-                dry_run=True,
-            )
-        else:
-            if clip.exists():
-                if clip.stat().st_size:
-                    continue
-                else:
-                    clip.unlink()
-            check_call(
-                'ffmpeg',
-                '-n',
-                '-ss',
-                cut.start,
-                '-to',
-                cut.end,
-                '-i',
-                args.input,
-                *join_filters(args.filters),
-                '-c:v',
-                args.encoder,
-                '-crf',
-                str(args.quality),
-                clip,
-                dry_run=args.dry_run,
-            )
+        clips.append(args.input, cut, clip := output.with_stem(f'{output.stem}-{len(clips):03}').with_suffix('.mkv'))
+        if not args.dry_run and clip.exists():
+            if clip.stat().st_size:
+                continue
+            else:
+                clip.unlink()
+        check_call(
+            'ffmpeg',
+            '-n',
+            '-ss',
+            cut.start,
+            '-to',
+            cut.end,
+            '-i',
+            args.input,
+            *join_filters(args.filters),
+            '-c:v',
+            args.encoder,
+            '-crf',
+            str(args.quality),
+            clip,
+            dry_run=args.dry_run,
+        )
 
 
 def join_clips(clips: ClipList, args, dirty=False):
