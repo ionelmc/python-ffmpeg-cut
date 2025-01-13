@@ -15,7 +15,7 @@ project = 'ffmpeg cut'
 year = '2024'
 author = 'Ionel Cristian Mărieș'
 copyright = f'{year}, {author}'
-version = release = '1.0.1'
+version = release = '1.0.2'
 
 pygments_style = 'trac'
 templates_path = ['.']

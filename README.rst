@@ -37,9 +37,9 @@ Overview
     :alt: Supported implementations
     :target: https://pypi.org/project/ffmpeg-cut
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/ionelmc/python-ffmpeg-cut/v1.0.1.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/ionelmc/python-ffmpeg-cut/v1.0.2.svg
     :alt: Commits since latest release
-    :target: https://github.com/ionelmc/python-ffmpeg-cut/compare/v1.0.1...main
+    :target: https://github.com/ionelmc/python-ffmpeg-cut/compare/v1.0.2...main
 
 
 
