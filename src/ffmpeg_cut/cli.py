@@ -17,11 +17,13 @@ Why does this file exist, and why not put this in __main__?
 
 import argparse
 import pathlib
+import platform
 import re
 import shlex
 import subprocess
 import textwrap
 
+from . import __version__
 from .structs import ClipList
 from .structs import Cut
 from .structs import Instruction
@@ -134,6 +136,12 @@ parser_join_group.add_argument(
 )
 parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
 parser.add_argument('-d', '--dry-run', action='store_true')
+parser.add_argument(
+    '-v',
+    '--version',
+    action='version',
+    version=f'ffmpeg-cut {__version__} ({platform.python_implementation()} {platform.python_version()})',
+)
 parser.add_argument('-r', '--dirty', action='store_true')
 parser.add_argument('-s', '--fps', dest='filters', action='extend', type=parse_fps, default=[])
 parser.add_argument(
@@ -390,5 +398,5 @@ def process(args):
 
 def run(args=None):
     args = parser.parse_args(args=args)
-    process(args.names)
+    process(args)
     parser.exit(0)

@@ -4,7 +4,7 @@ import subprocess
 def test_main():
     assert (
         subprocess.check_output(['ffmpeg-cut', '--help'], text=True)
-        == """usage: ffmpeg-cut [-h] [[-j | -c W:H | -f W:H |] -n] [-q CRF] [-d] [-r] [-s FILTERS] [-e ENCODER] [-t] [-l] input output [cut] [cut ...]
+        == """usage: ffmpeg-cut [-h] [[-j | -c W:H | -f W:H |] -n] [-q CRF] [-d] [-v] [-r] [-s FILTERS] [-e ENCODER] [-t] [-l] input output [cut] [cut ...]
 
 ffmpeg wrapper
 
@@ -23,6 +23,7 @@ options:
   -q CRF, --quality CRF
                         libx265 crf
   -d, --dry-run
+  -v, --version         show program's version number and exit
   -r, --dirty
   -s FILTERS, --fps FILTERS
   -e ENCODER, --encoder ENCODER
