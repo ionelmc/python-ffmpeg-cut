@@ -42,7 +42,7 @@ class ClipList:
         self.clips.append(Clip(input=input, cut=cut, output=output))
 
     def as_concat_input(self):
-        return '\n'.join(f'# {clip.input} {clip.cut.start}-{clip.cut.end}\n' f'file {str(clip.output)!r}\n' for clip in self.clips)
+        return '\n'.join(f'# {clip.input} {clip.cut.start}-{clip.cut.end}\nfile {str(clip.output)!r}\n' for clip in self.clips)
 
     def __len__(self):
         return len(self.clips)
