@@ -10,53 +10,57 @@ jobs:
       matrix:
         include:
           - name: 'check'
-            python: '3.11'
-            toxpython: 'python3.11'
+            python: '3.13'
             tox_env: 'check'
             os: 'ubuntu-latest'
           - name: 'docs'
-            python: '3.11'
-            toxpython: 'python3.11'
+            python: '3.13'
             tox_env: 'docs'
             os: 'ubuntu-latest'
-          - name: 'py39 (ubuntu)'
-            python: '3.9'
-            toxpython: 'python3.9'
-            python_arch: 'x64'
-            tox_env: 'py39'
-            os: 'ubuntu-latest'
-          - name: 'py310 (ubuntu)'
+          - name: 'py310 (ubuntu/x64)'
             python: '3.10'
-            toxpython: 'python3.10'
             python_arch: 'x64'
             tox_env: 'py310'
             os: 'ubuntu-latest'
-          - name: 'py311 (ubuntu)'
+            cover: true
+          - name: 'py311 (ubuntu/x64)'
             python: '3.11'
-            toxpython: 'python3.11'
             python_arch: 'x64'
             tox_env: 'py311'
             os: 'ubuntu-latest'
-          - name: 'py312 (ubuntu)'
+            cover: true
+          - name: 'py312 (ubuntu/x64)'
             python: '3.12'
-            toxpython: 'python3.12'
             python_arch: 'x64'
             tox_env: 'py312'
             os: 'ubuntu-latest'
-          - name: 'pypy39 (ubuntu)'
-            python: 'pypy-3.9'
-            toxpython: 'pypy3.9'
+            cover: true
+          - name: 'py313 (ubuntu/x64)'
+            python: '3.13'
             python_arch: 'x64'
-            tox_env: 'pypy39'
+            tox_env: 'py313'
             os: 'ubuntu-latest'
-          - name: 'pypy310 (ubuntu)'
+            cover: true
+          - name: 'py314 (ubuntu/x64)'
+            python: '3.14'
+            python_arch: 'x64'
+            tox_env: 'py314'
+            os: 'ubuntu-latest'
+            cover: true
+          - name: 'pypy310 (ubuntu/x64)'
             python: 'pypy-3.10'
-            toxpython: 'pypy3.10'
             python_arch: 'x64'
             tox_env: 'pypy310'
             os: 'ubuntu-latest'
+            cover: true
+          - name: 'pypy311 (ubuntu/x64)'
+            python: 'pypy-3.11'
+            python_arch: 'x64'
+            tox_env: 'pypy311'
+            os: 'ubuntu-latest'
+            cover: true
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - uses: actions/setup-python@v5
@@ -71,7 +75,5 @@ jobs:
         tox --version
         pip list --format=freeze
     - name: test
-      env:
-        TOXPYTHON: '${{ matrix.toxpython }}'
       run: >
         tox -e ${{ matrix.tox_env }} -v
