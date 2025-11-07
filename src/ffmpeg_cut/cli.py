@@ -115,15 +115,26 @@ If you use --text then the input file must contain instructions in the form:
 """,
 )
 parser_join_group = parser.add_mutually_exclusive_group()
-parser_crop_group = parser_join_group.add_mutually_exclusive_group()
 parser_cut_group = parser.add_mutually_exclusive_group()
-parser_crop_group.add_argument('-j', '--join', help='input file is ffmpeg concat instruction file', action='store_true')
-parser_crop_group.add_argument(
-    '-c', '--crop', help='crop input to a given ratio', type=parse_crop, action='extend', dest='filters', metavar='W:H', default=[]
+parser_join_group.add_argument(
+    '--join',
+    '-j',
+    help='input file is ffmpeg concat instruction file',
+    action='store_true',
 )
-parser_crop_group.add_argument(
-    '-f',
+parser_join_group.add_argument(
+    '--crop',
+    '-c',
+    help='crop input to a given ratio',
+    type=parse_crop,
+    action='extend',
+    dest='filters',
+    metavar='W:H',
+    default=[],
+)
+parser_join_group.add_argument(
     '--filter',
+    '-f',
     help='arbitrary filter on specific zone',
     type=parse_filter,
     action='extend',
@@ -132,27 +143,71 @@ parser_crop_group.add_argument(
     default=[],
 )
 parser_join_group.add_argument(
-    '-n', '--no-join', help='only produce the intermediary clips and ffmpeg concat instruction file', action='store_true'
+    '--no-join', '-n', help='only produce the intermediary clips and ffmpeg concat instruction file', action='store_true'
 )
-parser.add_argument('-q', '--quality', help='libx265 crf', type=int, default=15, metavar='CRF')
-parser.add_argument('-d', '--dry-run', action='store_true')
+parser.add_argument('--quality', '-q', help='libx265 crf', type=int, default=15, metavar='CRF')
+parser.add_argument('--dry-run', '-d', action='store_true')
 parser.add_argument(
-    '-v',
     '--version',
+    '-v',
     action='version',
     version=f'ffmpeg-cut {__version__} ({platform.python_implementation()} {platform.python_version()})',
 )
-parser.add_argument('-r', '--dirty', action='store_true')
-parser.add_argument('-s', '--fps', dest='filters', action='extend', type=parse_fps, default=[])
 parser.add_argument(
-    '-e', '--encoder', default='libx264', help='you can use `libx265` for better compression but possibly worse player support'
+    '--dirty',
+    '-r',
+    action='store_true',
 )
-parser.add_argument('input', help='input file', type=pathlib.Path)
-parser.add_argument('output', help='output file', type=pathlib.Path)
-parser_cut_group.add_argument('-t', '--text', help='input file is text file with cuts', action='store_true')
-parser_cut_group.add_argument('-l', '--clips', help='input file is clips file with cuts', action='store_true')
-parser_cut_group.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='?', action='append')
-parser.add_argument('cut', help='pair of timestamps to cut', type=parse_cut, nargs='*', action='extend')
+parser.add_argument(
+    '--fps',
+    '-s',
+    dest='filters',
+    action='extend',
+    type=parse_fps,
+    default=[],
+)
+parser.add_argument(
+    '--encoder',
+    '-e',
+    default='libx264',
+    help='you can use `libx265` for better compression but possibly worse player support',
+)
+parser.add_argument(
+    'input',
+    help='input file',
+    type=pathlib.Path,
+)
+parser.add_argument(
+    'output',
+    help='output file',
+    type=pathlib.Path,
+)
+parser_cut_group.add_argument(
+    '--text',
+    '-t',
+    help='input file is text file with cuts',
+    action='store_true',
+)
+parser_cut_group.add_argument(
+    '--clips',
+    '-l',
+    help='input file is clips file with cuts',
+    action='store_true',
+)
+parser_cut_group.add_argument(
+    'cut',
+    help='pair of timestamps to cut',
+    type=parse_cut,
+    nargs='?',
+    action='append',
+)
+parser.add_argument(
+    'cut',
+    help='pair of timestamps to cut',
+    type=parse_cut,
+    nargs='*',
+    action='extend',
+)
 
 
 def clips_cut(args):
